@@ -154,7 +154,10 @@ namespace profiler {
                 str_name = str_name.substr(0, it_for_at);
             }
 
-            baddr += start_addr;
+
+            if (!(start_addr < baddr && baddr < end_addr)) {
+                baddr += start_addr;
+            }
 
             if (baddr >= end_addr) {
                 continue;
@@ -173,31 +176,29 @@ namespace profiler {
                 const_cast<fn_desc_t &>(*it_prev)._size = it->_start_addr - it_prev->_start_addr;
                 it_prev = it;
             }
-
-            fn_descs.insert(fn_descs.end(), s_fn_descs.begin(), s_fn_descs.end());
         }
+
+        fn_descs.insert(fn_descs.end(), s_fn_descs.begin(), s_fn_descs.end());
     }
 
     void read_symbols_from_file(std::string const & path_to_file, uint64_t start_addr, uint64_t end_addr, std::vector<fn_desc_t> & fn_descs) {
-        static std::string s_cmd_for_generating_func_txt;
+        std::string cmd_for_generating_func_txt;
         std::string out_cmd;
 
-        if (s_cmd_for_generating_func_txt.empty()) {
-            static std::string check_supporting_dyn_syms("readelf --help | grep \"dyn-syms\"");
-            int rc = psc::create_process(check_supporting_dyn_syms, "", out_cmd);
-            if (-1 == rc) {
-                LOG << "check supporting dyn syms" << std::endl;
-            }
-
-            if (out_cmd.size() < 6) {
-                s_cmd_for_generating_func_txt = "readelf -s --wide " + path_to_file + R"( | grep -E "FUNC|OBJECT|NOTYPE|WEAK" | awk '{print $2 " " $3 " " $8}' | c++filt )";
-                LOG << std::endl << "you have old version of readelf" << std::endl << std::endl;;
-            } else {
-                s_cmd_for_generating_func_txt = "readelf -s --dyn-syms --wide " + path_to_file + R"( | grep -E "FUNC|OBJECT|NOTYPE|WEAK" | awk '{print $2 " " $3 " " $8}' | c++filt )";
-            }
+        static std::string check_supporting_dyn_syms("readelf --help | grep \"dyn-syms\"");
+        int rc = psc::create_process(check_supporting_dyn_syms, "", out_cmd);
+        if (-1 == rc) {
+            LOG << "check supporting dyn syms" << std::endl;
         }
 
-        int rc = psc::create_process(s_cmd_for_generating_func_txt, "", out_cmd);
+        if (out_cmd.size() < 6) {
+            cmd_for_generating_func_txt = "readelf -s --wide " + path_to_file + R"( | grep -E "FUNC|OBJECT|NOTYPE|WEAK" | awk '{print $2 " " $3 " " $8}' | c++filt )";
+            LOG << std::endl << "you have old version of readelf" << std::endl << std::endl;;
+        } else {
+            cmd_for_generating_func_txt = "readelf -s --dyn-syms --wide " + path_to_file + R"( | grep -E "FUNC|OBJECT|NOTYPE|WEAK" | awk '{print $2 " " $3 " " $8}' | c++filt )";
+        }
+
+        rc = psc::create_process(cmd_for_generating_func_txt, "", out_cmd);
 
         if (-1 == rc) {
             LOG << "some problem in readelf or c++filt, check that utilities" << std::endl;
@@ -237,11 +238,6 @@ namespace profiler {
 
                 if (0 != inode && "r-xp" == permissions) {
                     trim(path_to_lib);
-
-                    if (i < 3) {
-                        start_addr = 0;
-                        end_addr = std::numeric_limits<uint64_t>::max();
-                    }
 
                     profiler::LOG << "lib: " << path_to_lib << " "
                                   << std::hex << start_addr << " " << end_addr << " "
