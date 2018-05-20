@@ -110,6 +110,7 @@ int main(int argc, char *argv[]) {
             std::this_thread::sleep_for(milliseconds(process._cnt_milli_sec_for_sleep));
         }
     }
+    proceed = false;
 
     auto end = high_resolution_clock::now();
     cur_time = high_resolution_clock::to_time_t(end);
